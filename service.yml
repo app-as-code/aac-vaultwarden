@@ -1,0 +1,122 @@
+service:
+  name: aac-vaultwarden
+  friendly_name: Passwortmanager
+  image_repo: vaultwarden/server
+  image_tag: 1.37.4
+  description: Bitwarden-compatible password manager
+  icon: vaultwarden.png
+  category: Sicherheit
+  stage: prod
+  hostname: vault
+ports:
+- name: web
+  port: 80
+  external_port: 28981
+  protocol: TCP
+- name: websocket
+  port: 3012
+  external_port: 3012
+  protocol: TCP
+config:
+  domain_name: example.com
+  generate_hostname: false
+  integrations:
+    homepage:
+      enabled: true
+    autodns:
+      enabled: true
+      create_wildcard: true
+    traefik:
+      enabled: true
+      cert_resolver: ionos
+      entrypoint: websecure
+  schema_version: 2
+stage_overrides:
+  prod:
+    config:
+      generate_hostname: false
+    service:
+      hostname: vault
+secrets:
+  DATABASE_URL: CHANGE_ME
+  ADMIN_TOKEN: CHANGE_ME
+  SSO_CLIENT_SECRET: CHANGE_ME
+  POSTGRES_DB: vaultwarden
+  POSTGRES_USER: vaultwarden
+  POSTGRES_PASSWORD: CHANGE_ME
+volumes:
+  config:
+    description: Vaultwarden data, attachments, and configuration
+  db_data:
+    description: Data for database
+deployment_strategy:
+  main:
+    enabled: true
+    target_stage: prod
+  dev:
+    enabled: true
+    target_stage: dev
+  test:
+    enabled: false
+    target_stage: test
+  ansible-dev:
+    enabled: true
+    target_stage: dev
+  iac-dev:
+    enabled: true
+    target_stage: dev
+  template-dev:
+    enabled: true
+    target_stage: dev
+deployments:
+  docker_compose:
+    restart_policy: always
+    host_base_path: /export/docker
+    volumes:
+    - config:/data
+    environment:
+      PUID: '{{ vars.PUID }}'
+      PGID: '{{ vars.PGID }}'
+      DATA_FOLDER: '{{ vars.DATA_FOLDER }}'
+      DOMAIN: '{{ vars.DOMAIN }}'
+      WEBSOCKET_ENABLED: '{{ vars.WEBSOCKET_ENABLED }}'
+      SSO_ENABLED: '{{ vars.SSO_ENABLED }}'
+      SSO_AUTHORITY: '{{ vars.SSO_AUTHORITY }}'
+      SSO_SCOPES: '{{ vars.SSO_SCOPES }}'
+      SSO_CLIENT_ID: '{{ vars.SSO_CLIENT_ID }}'
+      SSO_DEBUG_TOKENS: '{{ vars.SSO_DEBUG_TOKENS }}'
+      POSTGRES_DB: '{{ secrets.POSTGRES_DB }}'
+      POSTGRES_USER: '{{ secrets.POSTGRES_USER }}'
+      TZ: '{{ vars.TZ }}'
+      DATABASE_URL: '{{ secrets.DATABASE_URL }}'
+      ADMIN_TOKEN: '{{ secrets.ADMIN_TOKEN }}'
+      SSO_CLIENT_SECRET: '{{ secrets.SSO_CLIENT_SECRET }}'
+      POSTGRES_PASSWORD: '{{ secrets.POSTGRES_PASSWORD }}'
+dependencies:
+  database:
+    import: catalog/postgres.yml
+    overrides:
+      name: aac-vaultwarden-db
+      image_tag: '18'
+      volumes:
+        db:
+          target: /var/lib/postgresql
+          description: Persistent storage for db
+      environment:
+        PUID: '{{ vars.PUID }}'
+        PGID: '{{ vars.PGID }}'
+        TZ: '{{ vars.TZ }}'
+vars:
+  PUID: '1000'
+  PGID: '1000'
+  DATA_FOLDER: /data
+  DOMAIN: vault.example.com
+  WEBSOCKET_ENABLED: 'true'
+  SSO_ENABLED: 'true'
+  SSO_AUTHORITY: https://vault.example.com
+  SSO_SCOPES: email profile offline_access
+  SSO_CLIENT_ID: CHANGE_ME
+  SSO_DEBUG_TOKENS: CHANGE_ME
+  POSTGRES_DB: vaultwarden
+  POSTGRES_USER: vaultwarden
+  TZ: Europe/Berlin

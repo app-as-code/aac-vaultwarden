@@ -1,0 +1,109 @@
+services:
+  # --- Main Application Service ---
+  aac-vaultwarden:
+    image: "vaultwarden/server:1.37.4"
+    container_name: "aac-vaultwarden"
+    hostname: "vault"
+    restart: "always"
+
+
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      DATA_FOLDER: "/data"
+      DOMAIN: "vault.example.com"
+      WEBSOCKET_ENABLED: "true"
+      SSO_ENABLED: "true"
+      SSO_AUTHORITY: "https://vault.example.com"
+      SSO_SCOPES: "email profile offline_access"
+      SSO_CLIENT_ID: "${SSO_CLIENT_ID:?set SSO_CLIENT_ID in .env (see .env.example)}"
+      SSO_DEBUG_TOKENS: "${SSO_DEBUG_TOKENS:?set SSO_DEBUG_TOKENS in .env (see .env.example)}"
+      POSTGRES_DB: "vaultwarden"
+      POSTGRES_USER: "vaultwarden"
+      TZ: "Europe/Berlin"
+      DATABASE_URL: "${DATABASE_URL:?set DATABASE_URL in .env (see .env.example)}"
+      ADMIN_TOKEN: "${ADMIN_TOKEN:?set ADMIN_TOKEN in .env (see .env.example)}"
+      SSO_CLIENT_SECRET: "${SSO_CLIENT_SECRET:?set SSO_CLIENT_SECRET in .env (see .env.example)}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (see .env.example)}"
+    ports:
+      - "28981:80/tcp"
+      - "3012:3012/tcp"
+
+    volumes:
+      - "/export/docker/aac-vaultwarden/config:/data"
+
+    networks:
+      - exposed
+      - interconnect
+      - secured
+      - stack_internal
+
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.aac-vaultwarden.rule: "Host(`vault.example.com`)"
+      traefik.http.routers.aac-vaultwarden.entrypoints: "websecure"
+      traefik.http.routers.aac-vaultwarden.tls: "true"
+      traefik.http.routers.aac-vaultwarden.tls.certresolver: "ionos"
+      traefik.docker.network: "services-secured"
+      traefik.http.services.aac-vaultwarden.loadbalancer.server.port: "80"
+      traefik.http.services.aac-vaultwarden.loadbalancer.server.scheme: "http"
+      auto-dns.createWildcard.aac-vaultwarden: "true"
+      auto-dns.customDNS.aac-vaultwarden: "true"
+      auto-dns.customDOMAIN.aac-vaultwarden: "example.com"
+      auto-dns.customHost.aac-vaultwarden: "vault"
+      homepage.group: "Sicherheit"
+      homepage.name: "Passwortmanager"
+      homepage.href: "https://vault.example.com"
+      homepage.icon: "vaultwarden.png"
+      homepage.description: "Bitwarden-compatible password manager"
+
+
+    depends_on:
+      aac-vaultwarden-db:
+        condition: service_healthy
+
+
+  # --- Service Dependencies (Sidecars) ---
+  aac-vaultwarden-db:
+    image: "postgres:18"
+    container_name: "aac-vaultwarden-db"
+    restart: "always"
+    
+
+    env_file:
+      - .env
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Europe/Berlin"
+
+
+    volumes:
+      - "/export/docker/aac-vaultwarden/db:/var/lib/postgresql"
+
+    networks:
+      - stack_internal
+
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-postgres}\" -d \"$${POSTGRES_DB:-postgres}\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+
+
+networks:
+  secured:
+    name: "services-secured"
+    external: true
+  exposed:
+    name: "services-exposed"
+    external: true
+  interconnect:
+    name: "docker-default"
+    external: true
+  stack_internal:
+    name: "aac-vaultwarden_stack_internal"
+    driver: "bridge"
+
